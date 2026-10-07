@@ -175,15 +175,8 @@ class RiskService:
         baseline_res = self._evaluate_baseline(snapshot, baseline, scanned_txs)
 
         diffs = engine.diff_results(candidate, baseline_res)
-        diffs_truncated = False
-        if request.max_diffs is not None:
-            if request.max_diffs < 1:
-                raise ApiError(VALIDATION_ERROR, "max_diffs must be >= 1",
-                               status=422)
-            if len(diffs) > request.max_diffs:
-                diffs = diffs[:request.max_diffs]
-                diffs_truncated = True
-
+        # Summary always reflects the FULL diff set; max_diffs only caps how
+        # many entries are returned.
         summary = DryRunSummary(
             evaluated=len(scanned_txs),
             candidate_hits=sum(1 for r in candidate.values() if r.hits),
@@ -192,6 +185,14 @@ class RiskService:
             removed=sum(1 for d in diffs if d.change_type == "removed"),
             changed=sum(1 for d in diffs if d.change_type == "changed"),
         )
+        diffs_truncated = False
+        if request.max_diffs is not None:
+            if request.max_diffs < 1:
+                raise ApiError(VALIDATION_ERROR, "max_diffs must be >= 1",
+                               status=422)
+            if len(diffs) > request.max_diffs:
+                diffs = diffs[:request.max_diffs]
+                diffs_truncated = True
         return DryRunResponse(data_version=snapshot.data_version,
                               baseline_rule_version=baseline.version,
                               summary=summary, diffs=diffs,
